@@ -14,23 +14,21 @@ stub = modal.Stub(
     ),
 )
 
-@stub.function
+@stub.function()
 def foo():
     import re
     import pandas as pd
     import nltk
-    import sklearn
     from nltk.corpus import stopwords
     from nltk.stem.porter import PorterStemmer
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.model_selection import train_test_split
     from sklearn.linear_model import LogisticRegression
-    from sklearn.metrics import accuracy_score
 
     nltk.download('stopwords')
     data = pd.read_csv('/train.csv')
     data = data.fillna('')
-    data.content = data.author + ' ' + data.title
+    #data['content'] = data['author'] + ' ' + data['title']
     X = data.drop(columns='label', axis=1)
     Y = data['label']
 
@@ -43,10 +41,10 @@ def foo():
         review = ' '.join(review)
         return review
 
-    data.content = data.content.apply(stemming)
+    data['text'] = data['text'].apply(stemming)
 
-    X = data.content.values
-    Y = data.label.values
+    X = data['text'].values
+    Y = data['label'].values
 
     vectorizer = TfidfVectorizer()
     vectorizer.fit(X)
@@ -56,10 +54,37 @@ def foo():
 
     model = LogisticRegression()
     model.fit(X_train, Y_train)
-    X_train_prediction = model.predict(X_train)
-    training_data_accuracy = accuracy_score(X_train_prediction, Y_train)
-    print('Accuracy score of the training data : ', training_data_accuracy)
+    X_train_prediction = model.predict(X[0])
+    if X_train_prediction[0] == 0:
+        print("heck yes")
+    else:
+        print("no")
+
+    X1_train, X1_test, Y1_train, Y1_test = train_test_split(X, Y, test_size=0.33, random_state=42)
+
+    from sklearn.naive_bayes import MultinomialNB
+    classifier = MultinomialNB()
+    classifier.fit(X1_train, Y1_train)
+    prediction1 = classifier.predict(X[0])
+    if prediction1[0] == 0:
+        print("hell yeah")
+    else:
+        print("no")
+
+    X2_train, X2_test, Y2_train, Y2_test = train_test_split(X, Y, test_size=0.33, random_state=42)
+
+    from sklearn.linear_model import PassiveAggressiveClassifier
+    linear_clf = PassiveAggressiveClassifier(max_iter=50)
+
+    linear_clf.fit(X2_train, Y2_train)
+    prediction2 = linear_clf.predict(X[0])
+    if prediction2[0] == 0:
+        print("shmyeah")
+    else:
+        print("nahhh ain't no way")
 
 @stub.local_entrypoint
 def main():
+    author = "Toluse Olorunnipa"
+    title = "Buttigieg, White House face backlash in aftermath of Ohio derailment"
     foo.call()
