@@ -1,90 +1,65 @@
 import modal
+from fastapi import FastAPI
+from pydantic import BaseModel
+from fastapi.encoders import jsonable_encoder
 
-stub = modal.Stub(
-    image=modal.Image.debian_slim()
+web_app = FastAPI()
+image=(modal.Image.debian_slim()
     .apt_install("curl")
     .run_commands(
         "apt-get update",
         "curl -O https://raw.githubusercontent.com/TruthQuestWeb/ml-model/main/train.csv",
     ).pip_install(
         "pandas",
-        "numpy",
-        "nltk",
         "scikit-learn",
-    ),
-)
+        "numpy",
+        "requests"
+    ))
+
+stub = modal.Stub(image=image)
+
+class Article(BaseModel):
+    text: str
 
 @stub.function()
-def foo():
-    import re
-    import pandas as pd
-    import nltk
-    from nltk.corpus import stopwords
-    from nltk.stem.porter import PorterStemmer
+def foo(articles):
+    from sklearn.feature_extraction.text import CountVectorizer
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.model_selection import train_test_split
-    from sklearn.linear_model import LogisticRegression
-
-    nltk.download('stopwords')
-    data = pd.read_csv('/train.csv')
-    data = data.fillna('')
-    #data['content'] = data['author'] + ' ' + data['title']
-    X = data.drop(columns='label', axis=1)
-    Y = data['label']
-
-    port_stem = PorterStemmer()
-    def stemming(content):
-        review = re.sub('[^a-zA-Z]', ' ', content)
-        review = review.lower()
-        review = review.split()
-        review = [port_stem.stem(word) for word in review if not word in stopwords.words('english')]
-        review = ' '.join(review)
-        return review
-
-    data['text'] = data['text'].apply(stemming)
-
-    X = data['text'].values
-    Y = data['label'].values
-
-    vectorizer = TfidfVectorizer()
-    vectorizer.fit(X)
-    X = vectorizer.transform(X)
-
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, stratify=Y, random_state=2)
-
-    model = LogisticRegression()
-    model.fit(X_train, Y_train)
-    X_train_prediction = model.predict(X[0])
-    if X_train_prediction[0] == 0:
-        print("heck yes")
-    else:
-        print("no")
-
-    X1_train, X1_test, Y1_train, Y1_test = train_test_split(X, Y, test_size=0.33, random_state=42)
-
     from sklearn.naive_bayes import MultinomialNB
-    classifier = MultinomialNB()
-    classifier.fit(X1_train, Y1_train)
-    prediction1 = classifier.predict(X[0])
-    if prediction1[0] == 0:
-        print("hell yeah")
+    from sklearn import metrics
+
+    import pandas as pd
+    df = pd.read_csv('/train.csv')
+
+    import numpy as np
+    df['text'].replace('', np.nan, inplace=True)
+    df.dropna(subset=['text'], inplace=True)
+
+    X_train, X_test, y_train, y_test = train_test_split(df.text, df.label, test_size=.2)
+
+    count_vectorizer = CountVectorizer(stop_words='english')
+    count_train = count_vectorizer.fit_transform(X_train)
+    count_test = count_vectorizer.transform(X_test)
+
+    nb_classifier = MultinomialNB()
+    nb_classifier.fit(count_train, y_train)
+
+    df = pd.DataFrame({'text': [articles]})
+    input = count_vectorizer.transform(df)
+    pred = nb_classifier.predict(input)
+    if pred == 1:
+        return jsonable_encoder({'result': 'true'})
     else:
-        print("no")
+        return jsonable_encoder({'result': 'false'})
 
-    X2_train, X2_test, Y2_train, Y2_test = train_test_split(X, Y, test_size=0.33, random_state=42)
+@web_app.post("/analysis/")
+async def analysis(articleobj: Article):
+    return foo.call(articleobj.text)
 
-    from sklearn.linear_model import PassiveAggressiveClassifier
-    linear_clf = PassiveAggressiveClassifier(max_iter=50)
+@stub.asgi(image=image)
+def fastapi_App():
+    return web_app
 
-    linear_clf.fit(X2_train, Y2_train)
-    prediction2 = linear_clf.predict(X[0])
-    if prediction2[0] == 0:
-        print("shmyeah")
-    else:
-        print("nahhh ain't no way")
-
-@stub.local_entrypoint
-def main():
-    author = "Toluse Olorunnipa"
-    title = "Buttigieg, White House face backlash in aftermath of Ohio derailment"
-    foo.call()
+if __name__ == "__main__":
+    stub.deploy("webapp")
