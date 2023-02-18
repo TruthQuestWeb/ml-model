@@ -1,7 +1,12 @@
 import modal
 
 stub = modal.Stub(
-    image=modal.Image.debian_slim().pip_install(
+    image=modal.Image.debian_slim()
+    .apt_install("curl")
+    .run_commands(
+        "apt-get update",
+        "curl -O https://raw.githubusercontent.com/TruthQuestWeb/ml-model/main/train.csv",
+    ).pip_install(
         "pandas",
         "numpy",
         "nltk",
@@ -11,6 +16,7 @@ stub = modal.Stub(
 
 @stub.function
 def foo():
+    import re
     import pandas as pd
     import nltk
     import sklearn
@@ -21,7 +27,8 @@ def foo():
     from sklearn.linear_model import LogisticRegression
     from sklearn.metrics import accuracy_score
 
-    data = pd.read_csv('https://github.com/TruthQuestWeb/treehacks/blob/main/train.csv')
+    nltk.download('stopwords')
+    data = pd.read_csv('/train.csv')
     data = data.fillna('')
     data.content = data.author + ' ' + data.title
     X = data.drop(columns='label', axis=1)
