@@ -24,10 +24,8 @@ class Article(BaseModel):
 @stub.function()
 def foo(articles):
     from sklearn.feature_extraction.text import CountVectorizer
-    from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.model_selection import train_test_split
     from sklearn.naive_bayes import MultinomialNB
-    from sklearn import metrics
 
     import pandas as pd
     df = pd.read_csv('/train.csv')
@@ -40,18 +38,14 @@ def foo(articles):
 
     count_vectorizer = CountVectorizer(stop_words='english')
     count_train = count_vectorizer.fit_transform(X_train)
-    count_test = count_vectorizer.transform(X_test)
 
-    nb_classifier = MultinomialNB()
+    nb_classifier = MultinomialNB(probability=True)
     nb_classifier.fit(count_train, y_train)
 
     df = pd.DataFrame({'text': [articles]})
     input = count_vectorizer.transform(df)
-    pred = nb_classifier.predict(input)
-    if pred == 1:
-        return jsonable_encoder({'result': 'true'})
-    else:
-        return jsonable_encoder({'result': 'false'})
+    pred = nb_classifier.predict_proba(input)
+    return jsonable_encoder({'true': pred[1], 'false': pred[0]})
 
 @web_app.post("/analysis/")
 async def analysis(articleobj: Article):
