@@ -1,0 +1,11 @@
+#Experimental (testing)
+youdotcom
+undetected-chromedriver==2.1.1
+
+#Main
+scikit-learn
+numpy
+pandas
+beautifulsoup4
+dotenv
+requests
